@@ -8,6 +8,10 @@ If a model produces a generative response, then we use a model grader at a later
 # %% imports
 import polars as pl
 import datasets
+import json
+
+from dataclasses import dataclass
+from typing import Callable
 # %% explore a hf dataset
 # Load and explore the sciq dataset
 dataset = datasets.load_from_disk('/workspace/linear-probes-improve/raw_data/47_reasoning_tf')
@@ -15,9 +19,14 @@ dataset = datasets.load_from_disk('/workspace/linear-probes-improve/raw_data/47_
 df = pl.from_pandas(dataset['train'].to_pandas())
 df
 # %%
-sciq_dataset = datasets.load_from_disk('/workspace/linear-probes-improve/raw_data/36_sciq_tf')
 
-sciq_df = pl.from_pandas(sciq_dataset['train'].to_pandas())
+def load_hf_dataset(path: str, split: str = 'train') -> pl.DataFrame:
+    """Generic function to load any HuggingFace dataset from disk"""
+    dataset = datasets.load_from_disk(path)
+    df = pl.from_pandas(dataset[split].to_pandas())
+    return df
+
+sciq_df = load_hf_dataset('/workspace/linear-probes-improve/raw_data/36_sciq_tf')
 
 def process_sciq_tf(df: pl.DataFrame) -> pl.DataFrame:
     out_data = []
@@ -32,9 +41,8 @@ def process_sciq_tf(df: pl.DataFrame) -> pl.DataFrame:
 process_sciq_tf(sciq_df)
     
 # %%
-reasoning_dataset = datasets.load_from_disk('/workspace/linear-probes-improve/raw_data/47_reasoning_tf')
 
-reasoning_df = pl.from_pandas(reasoning_dataset['train'].to_pandas())
+reasoning_df = load_hf_dataset('/workspace/linear-probes-improve/raw_data/47_reasoning_tf')
 
 def process_reasoning_tf(df: pl.DataFrame) -> pl.DataFrame:
     out_data = []
@@ -49,9 +57,7 @@ def process_reasoning_tf(df: pl.DataFrame) -> pl.DataFrame:
 process_reasoning_tf(reasoning_df)
 
 # %%
-cs_dataset = datasets.load_from_disk('/workspace/linear-probes-improve/raw_data/54_cs_tf')
-
-cs_df = pl.from_pandas(cs_dataset['train'].to_pandas())
+cs_df = load_hf_dataset('/workspace/linear-probes-improve/raw_data/54_cs_tf')
 # %%
 def process_cs(df: pl.DataFrame) -> pl.DataFrame:
     df1 = df.filter(pl.col('confidence').ge(0.9))
@@ -67,10 +73,7 @@ def process_cs(df: pl.DataFrame) -> pl.DataFrame:
 process_cs(cs_df)
 
 # %%
-cola_dataset = datasets.load_from_disk('/workspace/linear-probes-improve/raw_data/87_glue_cola')
-
-cola_df = pl.from_pandas(cola_dataset['train'].to_pandas())
-cola_df[0]['sentence'].item()
+cola_df = load_hf_dataset('/workspace/linear-probes-improve/raw_data/87_glue_cola')
 # %%
 def process_cola(df: pl.DataFrame) -> pl.DataFrame:
     out_data = []
@@ -84,9 +87,7 @@ def process_cola(df: pl.DataFrame) -> pl.DataFrame:
 
 process_cola(cola_df)
 # %%
-mrpc_dataset = datasets.load_from_disk('/workspace/linear-probes-improve/raw_data/89_glue_mrpc')
-
-mrpc_df = pl.from_pandas(mrpc_dataset['train'].to_pandas())
+mrpc_df = load_hf_dataset('/workspace/linear-probes-improve/raw_data/89_glue_mrpc')
 # %%
 def process_mrpc(df: pl.DataFrame) -> pl.DataFrame:
     out_data = []
@@ -100,10 +101,7 @@ def process_mrpc(df: pl.DataFrame) -> pl.DataFrame:
 
 process_mrpc(mrpc_df)
 # %%
-qnli_dataset = datasets.load_from_disk('/workspace/linear-probes-improve/raw_data/90_glue_qnli')
-
-qnli_df = pl.from_pandas(qnli_dataset['train'].to_pandas())
-qnli_df
+qnli_df = load_hf_dataset('/workspace/linear-probes-improve/raw_data/90_glue_qnli')
 # %%
 def process_qnli(df: pl.DataFrame) -> pl.DataFrame:
     out_data = []
@@ -117,10 +115,7 @@ def process_qnli(df: pl.DataFrame) -> pl.DataFrame:
 
 process_qnli(qnli_df)
 # %%
-qqp_dataset = datasets.load_from_disk('/workspace/linear-probes-improve/raw_data/91_glue_qqp')
-
-qqp_df = pl.from_pandas(qqp_dataset['train'].to_pandas())
-qqp_df
+qqp_df = load_hf_dataset('/workspace/linear-probes-improve/raw_data/91_glue_qqp')
 # %%
 def process_qqp(df: pl.DataFrame) -> pl.DataFrame:
     out_data = []
@@ -134,10 +129,7 @@ def process_qqp(df: pl.DataFrame) -> pl.DataFrame:
 
 process_qqp(qqp_df)
 # %%
-sst2_dataset = datasets.load_from_disk('/workspace/linear-probes-improve/raw_data/92_glue_sst2')
-
-sst2_df = pl.from_pandas(sst2_dataset['train'].to_pandas())
-sst2_df
+sst2_df = load_hf_dataset('/workspace/linear-probes-improve/raw_data/92_glue_sst2')
 # %%
 def process_sst2(df: pl.DataFrame) -> pl.DataFrame:
     out_data = []
@@ -151,10 +143,13 @@ def process_sst2(df: pl.DataFrame) -> pl.DataFrame:
 
 process_sst2(sst2_df)
 # %%
-aigen_dataset = datasets.load_from_disk('/workspace/linear-probes-improve/raw_data/94_ai_gen')
+def load_aigen(path: str, split: str = 'train') -> pl.DataFrame:
+    aigen_dataset = datasets.load_from_disk(path)
 
-aigen_df = pl.from_pandas(aigen_dataset['train'].to_pandas()).head(10000)
-aigen_df[1]['text'].item()
+    aigen_df = pl.from_pandas(aigen_dataset[split].to_pandas()).head(10000)
+    return aigen_df
+
+aigen_df = load_aigen('/workspace/linear-probes-improve/raw_data/94_ai_gen')
 # %%
 def process_aigen(df: pl.DataFrame) -> pl.DataFrame:
     out_data = []
@@ -168,10 +163,7 @@ def process_aigen(df: pl.DataFrame) -> pl.DataFrame:
 
 process_aigen(aigen_df)
 # %%
-toxic_dataset = datasets.load_from_disk('/workspace/linear-probes-improve/raw_data/95_toxic_is')
-
-toxic_df = pl.from_pandas(toxic_dataset['train'].to_pandas())
-toxic_df
+toxic_df = load_hf_dataset('/workspace/linear-probes-improve/raw_data/95_toxic_is')
 # %%
 def process_toxic(df: pl.DataFrame) -> pl.DataFrame:
     out_data = []
@@ -185,10 +177,7 @@ def process_toxic(df: pl.DataFrame) -> pl.DataFrame:
 
 process_toxic(toxic_df)
 # %%
-clickbait_dataset = datasets.load_from_disk('/workspace/linear-probes-improve/raw_data/105_click_bait')
-
-clickbait_df = pl.from_pandas(clickbait_dataset['train'].to_pandas())
-clickbait_df
+clickbait_df = load_hf_dataset('/workspace/linear-probes-improve/raw_data/105_click_bait')
 
 # %%
 def process_clickbait(df: pl.DataFrame) -> pl.DataFrame:
@@ -204,7 +193,11 @@ def process_clickbait(df: pl.DataFrame) -> pl.DataFrame:
 process_clickbait(clickbait_df)
 # %%
 
-aimade_df = pl.read_csv('/workspace/linear-probes-improve/raw_data/110_aimade_humangpt3/FinalDataset.csv').head(10000)
+def load_aimade(path: str) -> pl.DataFrame:
+    aimade_df = pl.read_csv(path).head(10000)
+    return aimade_df
+
+aimade_df = load_aimade('/workspace/linear-probes-improve/raw_data/110_aimade_humangpt3/FinalDataset.csv')
 aimade_df
 # %%
 def process_aimade(df: pl.DataFrame) -> pl.DataFrame:
@@ -219,10 +212,7 @@ def process_aimade(df: pl.DataFrame) -> pl.DataFrame:
 
 process_aimade(aimade_df)
 # %%
-movie_sent_dataset = datasets.load_from_disk('/workspace/linear-probes-improve/raw_data/113_movie_sent')
-
-movie_sent_df = pl.from_pandas(movie_sent_dataset['train'].to_pandas())
-movie_sent_df
+movie_sent_df = load_hf_dataset('/workspace/linear-probes-improve/raw_data/113_movie_sent')
 
 # %%
 def process_movie(df: pl.DataFrame) -> pl.DataFrame:
@@ -237,7 +227,11 @@ def process_movie(df: pl.DataFrame) -> pl.DataFrame:
 
 process_movie(movie_sent_df)
 # %%
-headline_trump = pl.read_csv('/workspace/linear-probes-improve/raw_data/21_headline_istrump.csv')[['headline','is_trump']]
+def load_headline_trump(path: str) -> pl.DataFrame:
+    headline_trump = pl.read_csv(path)[['headline','is_trump']]
+    return headline_trump
+
+headline_trump = load_headline_trump('/workspace/linear-probes-improve/raw_data/21_headline_istrump.csv')
 headline_trump
 # %%
 def process_headline(df: pl.DataFrame) -> pl.DataFrame:
@@ -252,11 +246,14 @@ def process_headline(df: pl.DataFrame) -> pl.DataFrame:
 
 process_headline(headline_trump)
 # %%
-import json
 
-with open('/workspace/linear-probes-improve/raw_data/44_phys_tf.jsonl', 'r') as f:
-    phys_data = [json.loads(line) for line in f]
-phys_df = pl.DataFrame(phys_data)
+def load_phys(path: str) -> pl.DataFrame:
+    with open(path, 'r') as f:
+        phys_data = [json.loads(line) for line in f]
+    phys_df = pl.DataFrame(phys_data)
+    return phys_df
+
+phys_df = load_phys('/workspace/linear-probes-improve/raw_data/44_phys_tf.jsonl')
 # %%
 def process_phys(df: pl.DataFrame) -> pl.DataFrame:
     out_data = []
@@ -270,7 +267,11 @@ def process_phys(df: pl.DataFrame) -> pl.DataFrame:
 
 process_phys(phys_df)
 # %%
-spam_df = pl.read_csv('/workspace/linear-probes-improve/raw_data/96_spam_is.csv')
+def load_spam(path: str) -> pl.DataFrame:
+    spam_df = pl.read_csv(path)
+    return spam_df
+
+spam_df = load_spam('/workspace/linear-probes-improve/raw_data/96_spam_is.csv')
 spam_df
 # %%
 def process_spam(df: pl.DataFrame) -> pl.DataFrame:
@@ -285,7 +286,11 @@ def process_spam(df: pl.DataFrame) -> pl.DataFrame:
 
 process_spam(spam_df)
 # %%
-hate_df = pl.read_csv('/workspace/linear-probes-improve/raw_data/106_hate_hate.csv')
+def load_hate(path: str) -> pl.DataFrame:
+    hate_df = pl.read_csv(path)
+    return hate_df
+
+hate_df = load_hate('/workspace/linear-probes-improve/raw_data/106_hate_hate.csv')
 # %%
 def process_hate(df: pl.DataFrame) -> pl.DataFrame:
     out_data = []
@@ -298,4 +303,129 @@ def process_hate(df: pl.DataFrame) -> pl.DataFrame:
     return pl.DataFrame(out_data)
 
 process_hate(hate_df)['correct_choice_idx']
+# %%
+@dataclass
+class DatasetConfig:
+    path: str
+    load_fn: Callable
+    process_fn: Callable
+
+
+# %%
+dataset_configs = [
+    DatasetConfig(
+        path='/workspace/linear-probes-improve/raw_data/36_sciq_tf',
+        load_fn = load_hf_dataset,
+        process_fn = process_sciq_tf
+    ),
+    DatasetConfig(
+        path='/workspace/linear-probes-improve/raw_data/47_reasoning_tf',
+        load_fn = load_hf_dataset,
+        process_fn = process_reasoning_tf
+    ),
+    DatasetConfig(
+        path='/workspace/linear-probes-improve/raw_data/54_cs_tf',
+        load_fn = load_hf_dataset,
+        process_fn = process_cs
+    ),
+    DatasetConfig(
+        path='/workspace/linear-probes-improve/raw_data/87_glue_cola',
+        load_fn = load_hf_dataset,
+        process_fn = process_cola
+    ),
+    DatasetConfig(
+        path='/workspace/linear-probes-improve/raw_data/89_glue_mrpc',
+        load_fn = load_hf_dataset,
+        process_fn = process_mrpc
+    ),
+    DatasetConfig(
+        path='/workspace/linear-probes-improve/raw_data/90_glue_qnli',
+        load_fn = load_hf_dataset,
+        process_fn = process_qnli
+    ),
+    DatasetConfig(
+        path='/workspace/linear-probes-improve/raw_data/91_glue_qqp',
+        load_fn = load_hf_dataset,
+        process_fn = process_qqp
+    ),
+    DatasetConfig(
+        path='/workspace/linear-probes-improve/raw_data/92_glue_sst2',
+        load_fn = load_hf_dataset,
+        process_fn = process_sst2
+    ),
+    DatasetConfig(
+        path='/workspace/linear-probes-improve/raw_data/94_ai_gen',
+        load_fn = load_aigen,
+        process_fn = process_aigen
+    ),
+    DatasetConfig(
+        path='/workspace/linear-probes-improve/raw_data/95_toxic_is',
+        load_fn = load_hf_dataset,
+        process_fn = process_toxic
+    ),
+    DatasetConfig(
+        path='/workspace/linear-probes-improve/raw_data/105_click_bait',
+        load_fn = load_hf_dataset,
+        process_fn = process_clickbait
+    ),
+    DatasetConfig(
+        path='/workspace/linear-probes-improve/raw_data/110_aimade_humangpt3/FinalDataset.csv',
+        load_fn = load_aimade,
+        process_fn = process_aimade
+    ),
+    DatasetConfig(
+        path='/workspace/linear-probes-improve/raw_data/113_movie_sent',
+        load_fn = load_hf_dataset,
+        process_fn = process_movie
+    ),
+    DatasetConfig(
+        path='/workspace/linear-probes-improve/raw_data/21_headline_istrump.csv',
+        load_fn = load_headline_trump,
+        process_fn = process_headline
+    ),
+    DatasetConfig(
+        path='/workspace/linear-probes-improve/raw_data/44_phys_tf.jsonl',
+        load_fn = load_phys,
+        process_fn = process_phys
+    ),
+    DatasetConfig(
+        path='/workspace/linear-probes-improve/raw_data/96_spam_is.csv',
+        load_fn = load_spam,
+        process_fn = process_spam
+    ),
+    DatasetConfig(
+        path='/workspace/linear-probes-improve/raw_data/106_hate_hate.csv',
+        load_fn = load_hate,
+        process_fn = process_hate
+    ),
+]
+# %%
+def load_and_process(config: DatasetConfig, split = None) -> pl.DataFrame:
+    path = config.path
+    load_fn = config.load_fn
+    process_fn = config.process_fn
+
+    if split is None:
+        loaded_df = load_fn(path)
+    else:
+        loaded_df = load_fn(path,split)
+    processed_df = process_fn(loaded_df)
+    return processed_df
+
+processed_dfs = []
+
+for dataset_config in dataset_configs:
+    if dataset_config.load_fn == load_hf_dataset:
+        for split in ['train','validate','test']:
+            try:
+                df = load_and_process(dataset_config,split).with_columns(path = pl.lit(dataset_config.path))
+            except:
+                print(f'failed for {dataset_config.path}, {split}')
+            processed_dfs.append(df)
+    else:
+        df = load_and_process(dataset_config).with_columns(path = pl.lit(dataset_config.path))
+        processed_dfs.append(df)
+# %%
+processed_data = pl.concat(processed_dfs)
+processed_data.write_parquet('/workspace/linear-probes-improve/processed_data/choices.parquet')
 # %%
