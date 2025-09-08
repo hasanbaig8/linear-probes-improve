@@ -30,10 +30,10 @@ datasets_to_download = [
     ("nyu-mll/glue", "../raw_data/92_glue_sst2", "sst2"),
     ("rkotari/clickbait", "../raw_data/105_click_bait"),
     ("tasksource/commonsense_qa_2.0", "../raw_data/54_cs_tf"),
-    ("truthfulqa/truthful_qa", "../raw_data/41_truthqa_tf", 'multiple_choice')
+    ("truthfulqa/truthful_qa", "../raw_data/41_truthqa_tf", 'generation')
 ]
 
-for dataset_info in datasets_to_download:
+for dataset_info in [datasets_to_download[-1]]:
     dataset_name = dataset_info[0]
     save_path = dataset_info[1]
     
@@ -127,11 +127,30 @@ for dataset_info in kaggle_datasets:
     except Exception as e:
         print(f"Error downloading {dataset_name}: {e}")
 
-# %% b21212a54385872a8164e946ab3b8d9f
+# %% 
 
 # Copy files from temporary kagglehub cache to desired locations
- '''
-Downloaded clmentbisaillon/fake-and-real-news-dataset to temporary path: /root/.cache/kagglehub/datasets/clmentbisaillon/fake-and-real-news-dataset/versions/1
-Downloaded team-ai/spam-text-message-classification to temporary path: /root/.cache/kagglehub/datasets/team-ai/spam-text-message-classification/versions/1
-'''
+import zipfile
+
+# Unzip the 110_aimade_humangpt3.zip file
+zip_path = "/workspace/linear-probes-improve/raw_data/110_aimade_humangpt3.zip"
+extract_path = "/workspace/linear-probes-improve/raw_data/"
+
+try:
+    with zipfile.ZipFile(zip_path, 'r') as zip_ref:
+        zip_ref.extractall(extract_path)
+        print(f"Successfully extracted {zip_path} to {extract_path}")
+        
+        # Rename the extracted folder from "Complete Dataset" to "110_aimade_humangpt3"
+        old_name = os.path.join(extract_path, "Complete Dataset")
+        new_name = os.path.join(extract_path, "110_aimade_humangpt3")
+        
+        if os.path.exists(old_name):
+            os.rename(old_name, new_name)
+            print(f"Renamed '{old_name}' to '{new_name}'")
+        
+except Exception as e:
+    print(f"Error extracting {zip_path}: {e}")
+
  
+# %%
