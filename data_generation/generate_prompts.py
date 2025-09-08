@@ -34,7 +34,7 @@ all_qns_df = all_qns_df.with_columns(
 ).drop('shuffled_data')
 # %%
 prompt_df = all_qns_df.with_columns(
-    (pl.col('question') + pl.lit('\n') + pl.col('shuffled_choices').map_elements(choices_to_str)).alias('prompt')
+    (pl.col('shuffled_choices').map_elements(choices_to_str) + pl.col('question') + pl.lit('\n') + pl.col('shuffled_choices').map_elements(choices_to_str)).alias('prompt')
 )
 # %%
 prompt_df.head(1)['prompt'].item()
