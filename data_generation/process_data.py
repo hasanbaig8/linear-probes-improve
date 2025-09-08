@@ -81,7 +81,7 @@ def process_cola(df: pl.DataFrame) -> pl.DataFrame:
         out_row = dict()
         out_row['question'] = row['sentence'] + '\n Is this grammatically correct?'
         out_row['choices'] = ['yes','no']
-        out_row['correct_choice_idx'] = 1-row['label']
+        out_row['correct_choice_idx'] = (row['label'] + 1) % 2
         out_data.append(out_row)
     return pl.DataFrame(out_data)
 
@@ -95,7 +95,7 @@ def process_mrpc(df: pl.DataFrame) -> pl.DataFrame:
         out_row = dict()
         out_row['question'] = row['sentence1']+ '\n \n' + row['sentence1'] + '\n Are the above 2 sentences equivalent?'
         out_row['choices'] = ['yes','no']
-        out_row['correct_choice_idx'] = 1-row['label']
+        out_row['correct_choice_idx'] = (row['label'] + 1) % 2
         out_data.append(out_row)
     return pl.DataFrame(out_data)
 
@@ -109,7 +109,7 @@ def process_qnli(df: pl.DataFrame) -> pl.DataFrame:
         out_row = dict()
         out_row['question'] = 'Does the answer to the following question lie in the text below it \n \n' +row['question']+ '\n' + row['sentence']
         out_row['choices'] = ['yes','no']
-        out_row['correct_choice_idx'] = 1-row['label']
+        out_row['correct_choice_idx'] = (row['label']+1) % 2
         out_data.append(out_row)
     return pl.DataFrame(out_data)
 
@@ -123,7 +123,7 @@ def process_qqp(df: pl.DataFrame) -> pl.DataFrame:
         out_row = dict()
         out_row['question'] = row['question1']+ '\n \n' + row['question2'] + '\n Are the above 2 questions equivalent?'
         out_row['choices'] = ['yes','no']
-        out_row['correct_choice_idx'] = 1-row['label']
+        out_row['correct_choice_idx'] = (row['label'] + 1) % 2
         out_data.append(out_row)
     return pl.DataFrame(out_data)
 
@@ -137,7 +137,7 @@ def process_sst2(df: pl.DataFrame) -> pl.DataFrame:
         out_row = dict()
         out_row['question'] = 'Is this positive sentiment? \n ' + row['sentence']
         out_row['choices'] = ['yes','no']
-        out_row['correct_choice_idx'] = 1-row['label']
+        out_row['correct_choice_idx'] = (row['label'] + 1) % 2
         out_data.append(out_row)
     return pl.DataFrame(out_data)
 
@@ -416,6 +416,7 @@ processed_dfs = []
 
 for dataset_config in dataset_configs:
     if dataset_config.load_fn == load_hf_dataset:
+        # we take all of train, validate and test splits as we do our own splitting later
         for split in ['train','validate','test']:
             try:
                 df = load_and_process(dataset_config,split).with_columns(path = pl.lit(dataset_config.path))
