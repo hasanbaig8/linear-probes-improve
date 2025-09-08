@@ -41,3 +41,25 @@ prompt_df.head(1)['prompt'].item()
 # %%
 prompt_df.write_parquet('/workspace/linear-probes-improve/processed_data/prompts.parquet')
 # %%
+prompt_df
+# %%
+shuffled_prompts = prompt_df.sample(fraction=1.0,shuffle=True, seed=42)
+# %%
+shuffled_prompts = shuffled_prompts.with_columns(
+    pl.int_range(pl.len()).over('path').alias('row_number_in_path'),
+    (pl.len() - 1).over('path').alias('max_row_in_path')
+).with_columns(
+    (pl.col('row_number_in_path') / pl.col('max_row_in_path')).alias('proportion_through_path')
+)
+# %%
+TRAIN_FRAC = 0.6
+VALIDATE_FRAC = 0.2
+TEST_FRAC = 1-VALIDATE_FRAC - TRAIN_FRAC
+
+shuffled_prompts.filter(pl.col('proportion_through_path').le(TRAIN_FRAC)).write_parquet('/workspace/linear-probes-improve/processed_data/train_prompts.parquet')
+
+shuffled_prompts.filter(pl.col('proportion_through_path').ge(TRAIN_FRAC) & pl.col('proportion_through_path').le(TRAIN_FRAC + VALIDATE_FRAC)).write_parquet('/workspace/linear-probes-improve/processed_data/validate_prompts.parquet')
+
+shuffled_prompts.filter(pl.col('proportion_through_path').ge(TRAIN_FRAC + VALIDATE_FRAC)).write_parquet('/workspace/linear-probes-improve/processed_data/test_prompts.parquet')
+
+# %%

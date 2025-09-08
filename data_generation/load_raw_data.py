@@ -1,3 +1,6 @@
+'''
+Using the links in the master csv, download into raw_data folder
+'''
 # %% imports
 import pandas as pd
 import polars as pl
