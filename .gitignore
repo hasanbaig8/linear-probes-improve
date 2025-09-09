@@ -1,3 +1,11 @@
 data/
 raw_data/
 processed_data/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+.pytest_cache/
+*.pt

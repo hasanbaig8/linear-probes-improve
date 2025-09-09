@@ -1,3 +1,6 @@
+'''
+For getting activations out from a dataset of prompt, target_idx pairs
+'''
 # %%
 import torch
 from nnsight import NNsight, LanguageModel
@@ -23,6 +26,9 @@ from enum import Enum
 from prompts_dataset import DataConfig, PromptDataset, get_prompt_loader
 # %%
 class FinalTokenActivationsDataset(Dataset):
+    '''
+    stores activations (batch_size n_layers d_model) and correct_idx (batch_size)
+    '''
     def __init__(self, final_token_activations_pairs: List[Tuple[torch.Tensor, torch.Tensor]]):
         '''
         takes in pair of (activations_tensor, correct_idx_tensor)
@@ -42,8 +48,12 @@ class FinalTokenActivationsDataset(Dataset):
 We expect the X to be a list of prompts, and y to be target index
 '''
 class ActivationExtractor:
-    def __init__(self, data_config: DataConfig):
-        self.prompt_loader = get_prompt_loader(data_config)
+    def __init__(self, data_config: DataConfig, prompt_loader: Optional[DataLoader] = None):
+        self.data_config = data_config
+        if prompt_loader is None:
+            self.prompt_loader = get_prompt_loader(data_config)
+        else:
+            self.prompt_loader = prompt_loader
 
         #load the llm from huggingface via nnisght wrapper
         self.llm = LanguageModel(self.data_config.llm_name, device_map = "auto", dispatch=True)

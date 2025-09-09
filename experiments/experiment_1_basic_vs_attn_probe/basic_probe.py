@@ -33,8 +33,6 @@ class ProbeConfig:
     batch_size: int # this is the batch size for logistic probe training and eval
 
 
-
-
 class ProbeEvaluator:
     def __init__(self, probe_config: ProbeConfig, final_tokens_activations_dataset: FinalTokenActivationsDataset, data_split: DataSplit, logistic_classifier: Optional[LogisticClassifier] = None):
         self.probe_config = probe_config
@@ -77,55 +75,58 @@ class ProbeEvaluator:
 
 
 
-data_config = DataConfig(
-    train_prompts_file_path = '/workspace/linear-probes-improve/processed_data/train_prompts.parquet',
-    chosen_subset_path = '/workspace/linear-probes-improve/raw_data/105_click_bait',
-    n_samples_train = 1000,
-    batch_size = 8,
-    llm_name = "Qwen/Qwen2.5-1.5B"
-)
+if __name__ == "main":
+    '''
+    Component test for training and evaluating on validation set
+    '''
+    data_config = DataConfig(
+        train_prompts_file_path = '/workspace/linear-probes-improve/processed_data/train_prompts.parquet',
+        chosen_subset_path = '/workspace/linear-probes-improve/raw_data/105_click_bait',
+        n_samples_train = 1000,
+        batch_size = 8,
+        llm_name = "Qwen/Qwen2.5-1.5B"
+    )
+    
+    prompt_loader = get_prompt_loader(data_config)
+    train_activations_extractor = ActivationExtractor(data_config, prompt_loader)
+    train_final_tokens_activations_dataset = train_activations_extractor.get_final_token_activations_dataset() 
+    # %%
+    train_probe_config = ProbeConfig(
+        n_epochs = 2,
+        lr = 1e-5,
+        layer = -1,
+        n_classes = 2,
+        batch_size = 8,
+    )
+    train_probe_evaluator = ProbeEvaluator(
+        probe_config = train_probe_config,
+        data_split= DataSplit.TRAIN,
+        final_tokens_activations_dataset=train_final_tokens_activations_dataset
+    )
+    # %%
+    train_probe_evaluator.train_logistic_classifier()
+    # %%
+    validate_data_config = DataConfig(
+        train_prompts_file_path = '/workspace/linear-probes-improve/processed_data/validate_prompts.parquet',
+        chosen_subset_path = '/workspace/linear-probes-improve/raw_data/105_click_bait',
+        n_samples_train = 100,
+        batch_size = 8,
+        llm_name = "Qwen/Qwen2.5-1.5B"
+    )
 
 
-# %%
-train_activations_extractor = ActivationExtractor(data_config)
-train_final_tokens_activations_dataset = train_activations_extractor.get_final_token_activations_dataset()
-# %%
-train_probe_config = ProbeConfig(
-    n_epochs = 2,
-    lr = 1e-5,
-    layer = -1,
-    n_classes = 2,
-    batch_size = 8,
-)
-train_probe_evaluator = ProbeEvaluator(
-    probe_config = train_probe_config,
-    data_split= DataSplit.TRAIN,
-    final_tokens_activations_dataset=train_final_tokens_activations_dataset
-)
-# %%
-train_probe_evaluator.train_logistic_classifier()
-# %%
-validate_data_config = DataConfig(
-    train_prompts_file_path = '/workspace/linear-probes-improve/processed_data/validate_prompts.parquet',
-    chosen_subset_path = '/workspace/linear-probes-improve/raw_data/105_click_bait',
-    n_samples_train = 100,
-    batch_size = 8,
-    llm_name = "Qwen/Qwen2.5-1.5B"
-)
+    # %%
+    validate_probe_config = train_probe_config
+    validate_activation_extractor = ActivationExtractor(data_config)
+    validate_final_tokens_activations_dataset = validate_activation_extractor.get_final_token_activations_dataset()
+    validate_probe_evaluator = ProbeEvaluator(
+        probe_config = validate_probe_config,
+        final_tokens_activations_dataset = validate_final_tokens_activations_dataset,
+        data_split = DataSplit.VALIDATE,
+        logistic_classifier = train_probe_evaluator.logistic_classifier
+    )
 
+    validate_accuracy = validate_probe_evaluator.get_accuracy()
 
-# %%
-validate_probe_config = train_probe_config
-validate_activation_extractor = ActivationExtractor(data_config)
-validate_final_tokens_activations_dataset = validate_activation_extractor.get_final_token_activations_dataset()
-validate_probe_evaluator = ProbeEvaluator(
-    probe_config = validate_probe_config,
-    final_tokens_activations_dataset = validate_final_tokens_activations_dataset,
-    data_split = DataSplit.VALIDATE,
-    logistic_classifier = train_probe_evaluator.logistic_classifier
-)
-
-validate_accuracy = validate_probe_evaluator.get_accuracy()
-
-print(validate_accuracy)
-# %%
+    print(f'validation accuracy {validate_accuracy}')
+    # %%
