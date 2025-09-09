@@ -48,7 +48,7 @@ class FinalTokenActivationsDataset(Dataset):
 We expect the X to be a list of prompts, and y to be target index
 '''
 class ActivationExtractor:
-    def __init__(self, data_config: DataConfig, prompt_loader: Optional[DataLoader] = None):
+    def __init__(self, data_config: DataConfig, prompt_loader: Optional[DataLoader] = None, llm: Optional[LanguageModel] = None):
         self.data_config = data_config
         if prompt_loader is None:
             self.prompt_loader = get_prompt_loader(data_config)
@@ -56,7 +56,10 @@ class ActivationExtractor:
             self.prompt_loader = prompt_loader
 
         #load the llm from huggingface via nnisght wrapper
-        self.llm = LanguageModel(self.data_config.llm_name, device_map = "auto", dispatch=True)
+        if llm is None:
+            self.llm = LanguageModel(self.data_config.llm_name, device_map = "auto", dispatch=True)
+        else:
+            self.llm = llm
 
     def get_final_token_activations_dataset(self):
         final_token_activations_pairs=[]

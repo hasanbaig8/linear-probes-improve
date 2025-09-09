@@ -12,6 +12,8 @@ from basic_probe import ProbeConfig, ProbeEvaluator
 import uuid
 import polars as pl
 import random
+from nnsight import LanguageModel
+from copy import deepcopy
 # %%
 print('finished loading imports')
 TRAIN_PROMPTS_FILE_PATH = '/workspace/linear-probes-improve/processed_data/train_prompts.parquet'
@@ -39,6 +41,7 @@ class HyperparamVaryer:
             self.hyperparam_pairs.append((n_epochs, lr))
         self.subset_paths_list = pl.scan_parquet('/workspace/linear-probes-improve/processed_data/train_prompts.parquet').select(pl.col('path').unique()).collect()['path'].to_list()
         self.experiment_rows = []
+        self.llm = LanguageModel(LLM_NAME, device_map = "auto", dispatch=True)
     
     def evaluate_subset_path(self, chosen_subset_path: str):
         n_classes = len(
@@ -58,9 +61,10 @@ class HyperparamVaryer:
                     llm_name = LLM_NAME
         )
         print(f'fetching prompts for {chosen_subset_path}')
-        prompt_loader = get_prompt_loader(data_config)
-        train_activations_extractor = ActivationExtractor(data_config, prompt_loader)
-        validate_activation_extractor = ActivationExtractor(data_config)
+        train_activations_extractor = ActivationExtractor(data_config, llm=self.llm)
+        validate_data_config = deepcopy(data_config)
+        validate_data_config.train_prompts_file_path = VALIDATE_PROMPTS_FILE_PATH
+        validate_activation_extractor = ActivationExtractor(validate_data_config, llm=self.llm)
         print('extracting activations')
         train_final_tokens_activations_dataset = train_activations_extractor.get_final_token_activations_dataset()
         validate_final_tokens_activations_dataset = validate_activation_extractor.get_final_token_activations_dataset()
