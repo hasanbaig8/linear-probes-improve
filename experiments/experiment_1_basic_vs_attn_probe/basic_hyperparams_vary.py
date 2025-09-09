@@ -20,25 +20,21 @@ TRAIN_PROMPTS_FILE_PATH = '/workspace/linear-probes-improve/processed_data/train
 VALIDATE_PROMPTS_FILE_PATH = '/workspace/linear-probes-improve/processed_data/validate_prompts.parquet'
 N_SAMPLES_TRAIN = 1000
 LLM_NAME = "Qwen/Qwen2.5-1.5B"
-BATCH_SIZE = 16
+BATCH_SIZE = 64
 
 
-N_HYPERPARAM_VARIATIONS_PER_SUBSET_PATH = 10
 
-N_EPOCHS_LIST = [1,3,10,30,100]
-LR_LIST = [1e-6,3e-6,1e-5,3e-5,1e-4]
+N_EPOCHS_LIST = [200]
+LR_LIST = [1e-4]
 
-# Generate 10 randomly chosen pairs
-random.seed(42)  # For reproducibility
-
+# Generate all pairs
 # %% Load the prompts
 class HyperparamVaryer:
     def __init__(self):
         self.hyperparam_pairs = []
-        for _ in range(N_HYPERPARAM_VARIATIONS_PER_SUBSET_PATH):
-            n_epochs = random.choice(N_EPOCHS_LIST)
-            lr = random.choice(LR_LIST)
-            self.hyperparam_pairs.append((n_epochs, lr))
+        for n_epochs in N_EPOCHS_LIST:
+            for lr in LR_LIST:
+                self.hyperparam_pairs.append((n_epochs, lr))
         self.subset_paths_list = pl.scan_parquet('/workspace/linear-probes-improve/processed_data/train_prompts.parquet').select(pl.col('path').unique()).collect()['path'].to_list()
         self.experiment_rows = []
         self.llm = LanguageModel(LLM_NAME, device_map = "auto", dispatch=True)

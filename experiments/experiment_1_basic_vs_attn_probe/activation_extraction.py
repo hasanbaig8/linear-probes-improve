@@ -43,6 +43,16 @@ class FinalTokenActivationsDataset(Dataset):
     def __getitem__(self, idx):
         return self.activations[idx], self.correct_idx[idx]
 
+class AllTokenActivationsDataset(Dataset):
+    def __init__(self, all_token_activation_pairs: List[Tuple[torch.Tensor, torch.Tensor]], seq_idxs: List[int]):
+        self.all_token_activation_pairs = all_token_activation_pairs
+        self.seq_idxs = seq_idxs
+    
+    def __len__(self):
+        return len(self.all_token_activation_pairs)
+    
+    def __getitem__(self, idx: int):
+        return self.all_token_activation_pairs[idx][0][:,:self.seq_idxs[idx],:], self.all_token_activation_pairs[idx][0] #first index batch, then activation, then all layers, then up to the sequence posn, then all d_model
 
 '''
 We expect the X to be a list of prompts, and y to be target index
@@ -61,7 +71,7 @@ class ActivationExtractor:
         else:
             self.llm = llm
 
-    def get_final_token_activations_dataset(self):
+    def get_final_token_activations_dataset(self) -> FinalTokenActivationsDataset:
         final_token_activations_pairs=[]
         self.llm.eval()
         for X, y in self.prompt_loader:
@@ -83,3 +93,31 @@ class ActivationExtractor:
 
         final_token_activations_dataset = FinalTokenActivationsDataset(final_token_activations_pairs)
         return final_token_activations_dataset
+    
+    def get_all_token_activations_dataset(self):
+        all_token_activation_pairs=[]
+        seq_idxs_list = []
+        self.llm.eval()
+        for X, y in self.prompt_loader:
+
+            X = [self.llm.tokenizer.apply_chat_template([[
+                {"role": "user", "content": input_str}
+            ]],tokenize=False, add_generation_prompt=True)[0] for input_str in X]
+
+            seq_idxs = [len(self.llm.tokenizer.tokenize(input_str))  for input_str in X]
+            with torch.no_grad():
+                with self.llm.trace(X) as tracer:
+                    activations= rearrange(
+                        torch.stack([layer.output for layer in self.llm.model.layers]),
+                        'l b s h -> b l s h'
+                    )
+                    
+                    # Add each prompt individually to the dataset
+                    for i in range(len(X)):
+                        all_token_activation_pairs.append((activations[i:i+1], y[i:i+1]))
+                        seq_idxs_list.append(seq_idxs[i])
+
+        #dataset = (torch.concat([x[0] for x in final_token_activations]), torch.concat([x[1] for x in final_token_activations]))
+
+        all_token_activations_dataset = AllTokenActivationsDataset(all_token_activation_pairs, seq_idxs_list)
+        return all_token_activations_dataset
