@@ -25,7 +25,7 @@ from activation_extraction import AllTokenActivationsDataset, ActivationExtracto
 from training_primitives import DataSplit, LogisticClassifier
 # %%
 @dataclass
-class ProbeConfig:
+class AttnProbeConfig:
     n_epochs: int
     lr: float
     layer: int # TODO: also allow None to train one for each layer
@@ -41,7 +41,7 @@ class AttentionProbeClassifier(nn.Module):
         self.d_head = d_head
         self.n_heads = n_heads
         self.d_model = input_dim
-        assert self.n_heads * self.d_heads == self.d_model, 'need n_heads * d_heads = d_model'
+        assert self.n_heads * self.d_head == self.d_model, 'need n_heads * d_heads = d_model'
         
         # Multi-head attention components
         self.W_q = nn.Linear(input_dim, d_head * n_heads, bias=False)
@@ -96,3 +96,114 @@ class AttentionProbeClassifier(nn.Module):
         logits = self.classifier(final_token_output)  # (batch_size, output_dim)
         
         return logits
+
+    
+class AttentionProbeEvaluator:
+    def __init__(self, probe_config: AttnProbeConfig, all_tokens_activations_dataset: AllTokenActivationsDataset, data_split: DataSplit, attention_probe_classifier: Optional[AttentionProbeClassifier] = None):
+        self.probe_config = probe_config
+        
+        self.all_tokens_activations_loader = DataLoader(dataset=all_tokens_activations_dataset, batch_size=probe_config.batch_size)
+        self.data_split = data_split
+        
+        # Get dimensions from the dataset by directly accessing the stored data
+        # The AllTokenActivationsDataset stores pairs with shape (1, n_layers, seq_len, d_model)
+        sample_activations_pair = all_tokens_activations_dataset.all_token_activation_pairs[0]
+        sample_activations = sample_activations_pair[0]  # (1, n_layers, seq_len, d_model)
+        d_model = sample_activations.shape[-1]
+        
+        if attention_probe_classifier is None:
+            self.attention_probe_classifier = AttentionProbeClassifier(d_model, probe_config.d_head, probe_config.n_heads, probe_config.n_classes).to('cuda')
+        else:
+            self.attention_probe_classifier = attention_probe_classifier
+        
+        self.optim = Adam(self.attention_probe_classifier.parameters(), lr=self.probe_config.lr)
+        self.loss_fn = CrossEntropyLoss()
+
+    def get_accuracy(self):
+        self.attention_probe_classifier.eval()
+        n_correct = 0
+        n_total = 0
+        for activations, actual, attention_mask in self.all_tokens_activations_loader:
+            # activations shape: (batch_size, n_layers, seq_len, d_model)
+            # Select the specified layer
+            layer_activations = activations[:, self.probe_config.layer, :, :].to('cuda')
+            preds = self.attention_probe_classifier(layer_activations, attention_mask.to('cuda')).argmax(-1)
+            n_correct += ((preds == actual.to('cuda')).sum()).cpu().item()
+            n_total += len(preds)
+        accuracy = n_correct / n_total
+        return accuracy
+
+    def train_attention_probe_classifier(self):
+        assert self.data_split == DataSplit.TRAIN
+
+        layer = self.probe_config.layer
+        for i in range(self.probe_config.n_epochs):
+            self.attention_probe_classifier.train()
+            self.attention_probe_classifier.zero_grad()
+            for activations, actual, attention_mask in self.all_tokens_activations_loader:
+                # activations shape: (batch_size, n_layers, seq_len, d_model)
+                # Select the specified layer
+                layer_activations = activations[:, layer, :, :].to('cuda')
+                print(activations.shape)
+                preds = self.attention_probe_classifier(layer_activations, attention_mask.to('cuda'))
+                loss = self.loss_fn(preds, actual.to('cuda')).type(torch.float32).to('cuda')
+                loss.backward()
+                self.optim.step()
+            accuracy = self.get_accuracy()
+            print(f'accuracy: {accuracy}')
+
+
+# %%
+if __name__ == "__main__":
+    '''
+    Component test for training and evaluating attention probe on validation set
+    '''
+    data_config = DataConfig(
+        train_prompts_file_path = '/workspace/linear-probes-improve/processed_data/train_prompts.parquet',
+        chosen_subset_path = '/workspace/linear-probes-improve/raw_data/105_click_bait',
+        n_samples_train = 10,
+        batch_size = 1,
+        llm_name = "Qwen/Qwen2.5-1.5B"
+    )
+    
+    prompt_loader = get_prompt_loader(data_config)
+    train_activations_extractor = ActivationExtractor(data_config, prompt_loader)
+    train_all_tokens_activations_dataset = train_activations_extractor.get_all_token_activations_dataset() 
+    train_probe_config = AttnProbeConfig(
+        n_epochs = 2,
+        lr = 1e-5,
+        layer = -1,
+        n_classes = 2,
+        batch_size = 2,
+        n_heads = 24,  # Number of attention heads for Qwen2.5-1.5B
+        d_head = 64,   # Dimension per head for Qwen2.5-1.5B
+    )
+    train_probe_evaluator = AttentionProbeEvaluator(
+        probe_config = train_probe_config,
+        data_split= DataSplit.TRAIN,
+        all_tokens_activations_dataset=train_all_tokens_activations_dataset
+    )
+    train_probe_evaluator.train_attention_probe_classifier()
+    validate_data_config = DataConfig(
+        train_prompts_file_path = '/workspace/linear-probes-improve/processed_data/validate_prompts.parquet',
+        chosen_subset_path = '/workspace/linear-probes-improve/raw_data/105_click_bait',
+        n_samples_train = 100,
+        batch_size = 1,
+        llm_name = "Qwen/Qwen2.5-1.5B"
+    )
+
+    validate_probe_config = train_probe_config
+    validate_activation_extractor = ActivationExtractor(validate_data_config)
+    validate_all_tokens_activations_dataset = validate_activation_extractor.get_all_token_activations_dataset()
+    validate_probe_evaluator = AttentionProbeEvaluator(
+        probe_config = validate_probe_config,
+        all_tokens_activations_dataset = validate_all_tokens_activations_dataset,
+        data_split = DataSplit.VALIDATE,
+        attention_probe_classifier = train_probe_evaluator.attention_probe_classifier
+    )
+
+    validate_accuracy = validate_probe_evaluator.get_accuracy()
+
+    print(f'validation accuracy {validate_accuracy}')
+
+# %%
