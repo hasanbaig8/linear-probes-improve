@@ -20,12 +20,12 @@ TRAIN_PROMPTS_FILE_PATH = '/workspace/linear-probes-improve/processed_data/train
 VALIDATE_PROMPTS_FILE_PATH = '/workspace/linear-probes-improve/processed_data/validate_prompts.parquet'
 N_SAMPLES_TRAIN = 1000
 LLM_NAME = "Qwen/Qwen2.5-1.5B"
-BATCH_SIZE = 8
+BATCH_SIZE = 16
 
 
 N_HYPERPARAM_VARIATIONS_PER_SUBSET_PATH = 10
 
-N_EPOCHS_LIST = [1,3,10,30,100,300]
+N_EPOCHS_LIST = [1,3,10,30,100]
 LR_LIST = [1e-6,3e-6,1e-5,3e-5,1e-4]
 
 # Generate 10 randomly chosen pairs
@@ -134,4 +134,13 @@ class HyperparamVaryer:
 hyperparam_varyer = HyperparamVaryer()
 print('initialised')
 hyperparam_varyer.evaluate_all()
+# %%
+import torch
+import gc
+
+# Clear CUDA cache and run garbage collection
+torch.cuda.empty_cache()
+gc.collect()
+print("CUDA memory cleared")
+
 # %%
